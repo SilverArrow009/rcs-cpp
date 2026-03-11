@@ -63,6 +63,31 @@ private:
      */
     void apply_cx(int control, int target);
 
+    /**
+     * @brief Applies a rotation around the X axis.
+     */
+    void apply_rx(int qubit, double theta);
+
+    /**
+     * @brief Applies a rotation around the Y axis.
+     */
+    void apply_ry(int qubit, double theta);
+
+    /**
+     * @brief Applies a rotation around the Z axis.
+     */
+    void apply_rz(int qubit, double theta);
+
+    /**
+     * @brief Applies a Toffoli (CCNOT) gate.
+     */
+    void apply_ccnot(int control1, int control2, int target);
+
+    /**
+     * @brief Applies an fSim (Fermionic simulation) gate.
+     */
+    void apply_fsim(int q1, int q2, double theta, double phi);
+
     int num_qubits_;
     std::vector<Complex> state_;
 };

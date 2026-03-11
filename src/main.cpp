@@ -19,13 +19,16 @@ void print_statevector(const std::vector<rcs::Complex>& sv) {
 
 void print_probabilities(const std::vector<rcs::Complex>& sv) {
     std::cout << "Probabilities: [" << std::endl;
+    double total_prob = 0.0;
     for (size_t i = 0; i < sv.size(); ++i) {
         double prob = std::norm(sv[i]);
+        total_prob += prob;
         std::cout << "  " << std::fixed << std::setprecision(6) << prob;
         if (i < sv.size() - 1) std::cout << ",";
         std::cout << std::endl;
     }
     std::cout << "]" << std::endl;
+    std::cout << "Total Probability: " << std::fixed << std::setprecision(10) << total_prob << std::endl;
 }
 
 int main(int argc, char* argv[]) {

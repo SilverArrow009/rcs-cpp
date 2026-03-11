@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Include directories
 include_directories(include)
 
+# Compile-time options for benchmark hardness
+set(CLIFFORD_RATIO 0.5 CACHE STRING "Proportion of Clifford gates (0.0 to 1.0)")
+add_definitions(-DCLIFFORD_RATIO=${CLIFFORD_RATIO})
+
 # Library source files
 set(LIB_SOURCES
     src/circuit.cpp
