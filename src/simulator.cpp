@@ -1,7 +1,6 @@
 #include "rcs/simulator.hpp"
 #include "rcs/gates_internal.hpp"
 #include <cmath>
-#include <iostream>
 
 namespace rcs {
 
@@ -42,33 +41,136 @@ void Simulator::apply_single_qubit_gate(int qubit, const std::complex<double> ma
     size_t size = 1ULL << num_qubits_;
     size_t spacing = 1ULL << qubit;
 
-    // Single-qubit gate application:
-    // We iterate over pairs of amplitudes (v0, v1) where v0 has the target bit as 0
-    // and v1 has the target bit as 1.
+#if defined(USE_CMPLX_EXT) || defined(NO_USE_CMPLX_EXT)
+    alignas(16) double m[8] = {
+        matrix[0][0].real(), matrix[0][0].imag(),
+        matrix[0][1].real(), matrix[0][1].imag(),
+        matrix[1][0].real(), matrix[1][0].imag(),
+        matrix[1][1].real(), matrix[1][1].imag()
+    };
+
+    for (size_t i = 0; i < size; i += (spacing * 2)) {
+        size_t j = 0;
+        while (j < spacing) {
+            size_t vl_double;
+            Complex* p0 = &state_[i + j];
+            Complex* p1 = &state_[i + j + spacing];
+            size_t count = (spacing - j) * 2;
+
+#ifdef USE_CMPLX_EXT
+            asm volatile(
+                "li t0, 2\n\t"
+                "vsetvli t0, t0, e64, m1, ta, ma\n\t"
+                "vle64.v v10, (%[m])\n\t"
+                "addi t0, %[m], 16\n\t"
+                "vle64.v v11, (t0)\n\t"
+                "addi t0, %[m], 32\n\t"
+                "vle64.v v12, (t0)\n\t"
+                "addi t0, %[m], 48\n\t"
+                "vle64.v v13, (t0)\n\t"
+                
+                "vsetvli %[vl], %[count], e64, m1, ta, ma\n\t"
+                "vid.v v5\n\t"
+                "vand.vi v5, v5, 1\n\t"
+                
+                "vrgather.vv v6, v10, v5\n\t"
+                "vrgather.vv v7, v11, v5\n\t"
+                "vrgather.vv v8, v12, v5\n\t"
+                "vrgather.vv v9, v13, v5\n\t"
+
+                "vle64.v v1, (%[p0])\n\t"
+                "vle64.v v2, (%[p1])\n\t"
+                
+                "vcfmul.vv v3, v1, v6\n\t"
+                "vcfmul.vv v14, v2, v7\n\t"
+                "vfadd.vv v3, v3, v14\n\t"
+                
+                "vcfmul.vv v4, v1, v8\n\t"
+                "vcfmul.vv v15, v2, v9\n\t"
+                "vfadd.vv v4, v4, v15\n\t"
+                
+                "vse64.v v3, (%[p0])\n\t"
+                "vse64.v v4, (%[p1])\n\t"
+                : [vl] "=r"(vl_double)
+                : [count] "r"(count), [p0] "r"(p0), [p1] "r"(p1), [m] "r"(m)
+                : "t0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9",
+                  "v10", "v11", "v12", "v13", "v14", "v15", "memory"
+            );
+#else
+            asm volatile(
+                "vsetvli %[vl], %[count], e64, m1, ta, mu\n\t" // mu is essential here
+                "vle64.v v1, (%[p0])\n\t"
+                "vle64.v v2, (%[p1])\n\t"
+                
+                "vid.v v3\n\t"
+                "vand.vi v4, v3, 1\n\t"
+                "vmseq.vi v0, v4, 0\n\t" 
+                "vxor.vi v3, v3, 1\n\t"
+                
+                "vrgather.vv v4, v1, v3\n\t"
+                "vrgather.vv v5, v2, v3\n\t"
+                
+                "vlse64.v v10, (%[m]), x0\n\t"
+                "addi t0, %[m], 8\n\t"
+                "vlse64.v v11, (t0), x0\n\t"
+                "addi t0, %[m], 16\n\t"
+                "vlse64.v v12, (t0), x0\n\t"
+                "addi t0, %[m], 24\n\t"
+                "vlse64.v v13, (t0), x0\n\t"
+                "addi t0, %[m], 32\n\t"
+                "vlse64.v v14, (t0), x0\n\t"
+                "addi t0, %[m], 40\n\t"
+                "vlse64.v v15, (t0), x0\n\t"
+                "addi t0, %[m], 48\n\t"
+                "vlse64.v v16, (t0), x0\n\t"
+                "addi t0, %[m], 56\n\t"
+                "vlse64.v v17, (t0), x0\n\t"
+                
+                "vfsgnjn.vv v11, v11, v11, v0.t\n\t"
+                "vfsgnjn.vv v13, v13, v13, v0.t\n\t"
+                "vfsgnjn.vv v15, v15, v15, v0.t\n\t"
+                "vfsgnjn.vv v17, v17, v17, v0.t\n\t"
+                
+                "vfmul.vv v6, v1, v10\n\t"
+                "vfmacc.vv v6, v4, v11\n\t"
+                "vfmul.vv v7, v2, v12\n\t"
+                "vfmacc.vv v7, v5, v13\n\t"
+                "vfadd.vv v6, v6, v7\n\t"
+                "vse64.v v6, (%[p0])\n\t"
+                
+                "vfmul.vv v8, v1, v14\n\t"
+                "vfmacc.vv v8, v4, v15\n\t"
+                "vfmul.vv v9, v2, v16\n\t"
+                "vfmacc.vv v9, v5, v17\n\t"
+                "vfadd.vv v8, v8, v9\n\t"
+                "vse64.v v8, (%[p1])\n\t"
+                : [vl] "=r"(vl_double)
+                : [count] "r"(count), [p0] "r"(p0), [p1] "r"(p1), [m] "r"(m)
+                : "t0", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9",
+                  "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "memory"
+            );
+#endif
+            j += (vl_double / 2);
+        }
+    }
+#else
     for (size_t i = 0; i < size; i += (spacing * 2)) {
         for (size_t j = 0; j < spacing; ++j) {
             size_t i0 = i + j;
             size_t i1 = i + j + spacing;
-
             Complex v0 = state_[i0];
             Complex v1 = state_[i1];
-
-            // Apply the 2x2 unitary matrix
             state_[i0] = matrix[0][0] * v0 + matrix[0][1] * v1;
             state_[i1] = matrix[1][0] * v0 + matrix[1][1] * v1;
         }
     }
+#endif
 }
 
 void Simulator::apply_cx(int control, int target) {
     size_t size = 1ULL << num_qubits_;
     size_t control_mask = 1ULL << control;
     size_t target_mask = 1ULL << target;
-
-    // Controlled-X application:
-    // If the control bit is set (1), we flip the target bit.
-    // This is equivalent to swapping amplitudes state[...0...] and state[...1...]
-    // for the target qubit's position, conditioned on the control qubit.
     for (size_t i = 0; i < size; ++i) {
         if ((i & control_mask) && !(i & target_mask)) {
             size_t i_target_set = i | target_mask;
@@ -80,30 +182,21 @@ void Simulator::apply_cx(int control, int target) {
 void Simulator::apply_rx(int qubit, double theta) {
     Complex c = std::cos(theta / 2.0);
     Complex s = Complex(0.0, -std::sin(theta / 2.0));
-    Complex matrix[2][2] = {
-        {c, s},
-        {s, c}
-    };
+    Complex matrix[2][2] = {{c, s}, {s, c}};
     apply_single_qubit_gate(qubit, matrix);
 }
 
 void Simulator::apply_ry(int qubit, double theta) {
     double c = std::cos(theta / 2.0);
     double s = std::sin(theta / 2.0);
-    Complex matrix[2][2] = {
-        {c, -s},
-        {s, c}
-    };
+    Complex matrix[2][2] = {{c, -s}, {s, c}};
     apply_single_qubit_gate(qubit, matrix);
 }
 
 void Simulator::apply_rz(int qubit, double theta) {
     Complex p = std::exp(Complex(0.0, -theta / 2.0));
     Complex m = std::exp(Complex(0.0, theta / 2.0));
-    Complex matrix[2][2] = {
-        {p, 0.0},
-        {0.0, m}
-    };
+    Complex matrix[2][2] = {{p, 0.0}, {0.0, m}};
     apply_single_qubit_gate(qubit, matrix);
 }
 
@@ -112,7 +205,6 @@ void Simulator::apply_ccnot(int control1, int control2, int target) {
     size_t c1_mask = 1ULL << control1;
     size_t c2_mask = 1ULL << control2;
     size_t target_mask = 1ULL << target;
-
     for (size_t i = 0; i < size; ++i) {
         if ((i & c1_mask) && (i & c2_mask) && !(i & target_mask)) {
             size_t i_target_set = i | target_mask;
@@ -125,19 +217,15 @@ void Simulator::apply_fsim(int q1, int q2, double theta, double phi) {
     size_t size = 1ULL << num_qubits_;
     size_t m1 = 1ULL << q1;
     size_t m2 = 1ULL << q2;
-
     Complex cos_t = std::cos(theta);
     Complex isin_t = Complex(0.0, -std::sin(theta));
     Complex phase_phi = std::exp(Complex(0.0, -phi));
-
     for (size_t i = 0; i < size; ++i) {
         if (!(i & m1) && (i & m2)) {
             size_t i01 = i;
             size_t i10 = (i ^ m2) | m1;
-            
             Complex v01 = state_[i01];
             Complex v10 = state_[i10];
-            
             state_[i01] = cos_t * v01 + isin_t * v10;
             state_[i10] = isin_t * v01 + cos_t * v10;
         } else if ((i & m1) && (i & m2)) {

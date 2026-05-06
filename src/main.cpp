@@ -9,7 +9,7 @@ void print_statevector(const std::vector<rcs::Complex>& sv) {
     std::cout << "Statevector (Index: Amplitude): [" << std::endl;
     for (size_t i = 0; i < sv.size(); ++i) {
         std::cout << "  " << std::setw(3) << i << ": " 
-                  << std::fixed << std::setprecision(6) 
+                  << std::scientific << std::setprecision(6) 
                   << "(" << std::setw(9) << sv[i].real() << ", " << std::setw(9) << sv[i].imag() << ")";
         if (i < sv.size() - 1) std::cout << ",";
         std::cout << std::endl;
@@ -23,7 +23,7 @@ void print_probabilities(const std::vector<rcs::Complex>& sv) {
     for (size_t i = 0; i < sv.size(); ++i) {
         double prob = std::norm(sv[i]);
         total_prob += prob;
-        std::cout << "  " << std::fixed << std::setprecision(6) << prob;
+        std::cout << "  " << std::scientific << std::setprecision(6) << prob;
         if (i < sv.size() - 1) std::cout << ",";
         std::cout << std::endl;
     }
@@ -49,12 +49,14 @@ int main(int argc, char* argv[]) {
 
     rcs::Simulator sim(num_qubits);
     
-    auto start = std::chrono::high_resolution_clock::now();
+    // Runtime for the simulation. Might be useful for validating native peformance
+    // auto start = std::chrono::high_resolution_clock::now();
     sim.run(circuit);
-    auto end = std::chrono::high_resolution_clock::now();
+    // auto end = std::chrono::high_resolution_clock::now();
 
-    std::chrono::duration<double> diff = end - start;
-    std::cout << "Simulation completed in " << diff.count() << " seconds." << std::endl;
+    // std::chrono::duration<double> diff = end - start;
+    // std::cout << "Simulation completed in " << diff.count() << " seconds." << std::endl;
+    std::cout << "Simulation completed" << std::endl;
 
     if (num_qubits <= 4) {
         print_statevector(sim.get_statevector());
