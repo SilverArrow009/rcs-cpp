@@ -1,4 +1,7 @@
-build/*
+build_baseline/*
+build_custom/*
+m5out/*
 tags
 compile_commands.json
 .cache
+AGENTS.md

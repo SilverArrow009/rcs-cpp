@@ -59,8 +59,7 @@ void Simulator::apply_single_qubit_gate(int qubit, const std::complex<double> ma
 
 #ifdef USE_CMPLX_EXT
             asm volatile(
-                "li t0, 2\n\t"
-                "vsetvli t0, t0, e64, m1, ta, ma\n\t"
+                "vsetvli %[vl], %[count], e64, m1\n\t"
                 "vle64.v v10, (%[m])\n\t"
                 "addi t0, %[m], 16\n\t"
                 "vle64.v v11, (t0)\n\t"
@@ -69,36 +68,33 @@ void Simulator::apply_single_qubit_gate(int qubit, const std::complex<double> ma
                 "addi t0, %[m], 48\n\t"
                 "vle64.v v13, (t0)\n\t"
                 
-                "vsetvli %[vl], %[count], e64, m1, ta, ma\n\t"
-                "vid.v v5\n\t"
-                "vand.vi v5, v5, 1\n\t"
+                "vid.v v14\n\t"
+                "vand.vi v14, v14, 1\n\t"
                 
-                "vrgather.vv v6, v10, v5\n\t"
-                "vrgather.vv v7, v11, v5\n\t"
-                "vrgather.vv v8, v12, v5\n\t"
-                "vrgather.vv v9, v13, v5\n\t"
+                "vrgather.vv v20, v10, v14\n\t"
+                "vrgather.vv v21, v11, v14\n\t"
+                "vrgather.vv v22, v12, v14\n\t"
+                "vrgather.vv v23, v13, v14\n\t"
 
                 "vle64.v v1, (%[p0])\n\t"
                 "vle64.v v2, (%[p1])\n\t"
                 
-                "vcfmul.vv v3, v1, v6\n\t"
-                "vcfmul.vv v14, v2, v7\n\t"
-                "vfadd.vv v3, v3, v14\n\t"
+                "vcfmul.vv v3, v1, v20\n\t"
+                "vcfmacc.vv v3, v21, v2\n\t"
                 
-                "vcfmul.vv v4, v1, v8\n\t"
-                "vcfmul.vv v15, v2, v9\n\t"
-                "vfadd.vv v4, v4, v15\n\t"
+                "vcfmul.vv v4, v1, v22\n\t"
+                "vcfmacc.vv v4, v23, v2\n\t"
                 
                 "vse64.v v3, (%[p0])\n\t"
                 "vse64.v v4, (%[p1])\n\t"
                 : [vl] "=r"(vl_double)
                 : [count] "r"(count), [p0] "r"(p0), [p1] "r"(p1), [m] "r"(m)
-                : "t0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9",
-                  "v10", "v11", "v12", "v13", "v14", "v15", "memory"
+                : "t0", "v1", "v2", "v3", "v4", "v10", "v11", "v12", "v13", "v14",
+                  "v20", "v21", "v22", "v23", "memory"
             );
 #else
             asm volatile(
-                "vsetvli %[vl], %[count], e64, m1, ta, mu\n\t" // mu is essential here
+                "vsetvli %[vl], %[count], e64, m1\n\t" // mu is essential here
                 "vle64.v v1, (%[p0])\n\t"
                 "vle64.v v2, (%[p1])\n\t"
                 
