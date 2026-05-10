@@ -42,7 +42,11 @@ void Simulator::apply_single_qubit_gate(int qubit, const std::complex<double> ma
     size_t spacing = 1ULL << qubit;
 
 #if defined(USE_CMPLX_EXT) || defined(NO_USE_CMPLX_EXT)
-    alignas(16) double m[8] = {
+#ifndef VLEN
+#define VLEN 1024
+#endif
+    constexpr size_t max_vl = VLEN / 64;
+    alignas(16) double m[max_vl + 8] = {
         matrix[0][0].real(), matrix[0][0].imag(),
         matrix[0][1].real(), matrix[0][1].imag(),
         matrix[1][0].real(), matrix[1][0].imag(),
@@ -56,6 +60,7 @@ void Simulator::apply_single_qubit_gate(int qubit, const std::complex<double> ma
             Complex* p0 = &state_[i + j];
             Complex* p1 = &state_[i + j + spacing];
             size_t count = (spacing - j) * 2;
+            if (count > max_vl) count = max_vl;
 
 #ifdef USE_CMPLX_EXT
             asm volatile(
@@ -94,7 +99,7 @@ void Simulator::apply_single_qubit_gate(int qubit, const std::complex<double> ma
             );
 #else
             asm volatile(
-                "vsetvli %[vl], %[count], e64, m1\n\t" // mu is essential here
+                "vsetvli %[vl], %[count], e64, m1\n\t"
                 "vle64.v v1, (%[p0])\n\t"
                 "vle64.v v2, (%[p1])\n\t"
                 

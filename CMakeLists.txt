@@ -18,6 +18,11 @@ include_directories(include)
 # Compile-time options for benchmark hardness
 set(CLIFFORD_RATIO 0.2 CACHE STRING "Proportion of Clifford gates (0.0 to 1.0)")
 add_definitions(-DCLIFFORD_RATIO=${CLIFFORD_RATIO})
+
+# Compile-time option for Vector Length (VLEN)
+set(VLEN 1024 CACHE STRING "Target VLEN in bits (128, 256, 512, 1024, 2048, 4096)")
+add_definitions(-DVLEN=${VLEN})
+
 # Compile-time defines for the standard and complex vector extensions
 option(USE_CMPLX_EXT "Use custom complex vector extensions" OFF)
 option(NO_USE_CMPLX_EXT "Use standard RVV-1.0 for complex operations" OFF)
